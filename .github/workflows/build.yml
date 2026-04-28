@@ -19,10 +19,9 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
             . /root/.cargo/env &&
             cd /src &&
+            pip install maturin &&
             export MATURIN_EXTRA_ARGS='--features pathway-ffi/standard-allocator' &&
-            pip install . --no-build-isolation -v 2>&1 | tail -30 &&
-            mkdir -p /src/wheels &&
-            pip wheel . --no-deps -w /src/wheels/
+            maturin build --release --features standard-allocator -o /src/wheels/
             "
       - uses: actions/upload-artifact@v4
         with:
