@@ -18,9 +18,10 @@ jobs:
             apt-get update && apt-get install -y git build-essential cmake curl pkg-config libssl-dev &&
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
             . /root/.cargo/env &&
+            rustup install 1.75.0 &&
+            rustup default 1.75.0 &&
             cd /src &&
             pip install maturin &&
-            export MATURIN_EXTRA_ARGS='--features pathway-ffi/standard-allocator' &&
             maturin build --release --features standard-allocator -o /src/wheels/
             "
       - uses: actions/upload-artifact@v4
