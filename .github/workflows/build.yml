@@ -1,0 +1,30 @@
+name: Build pathway ARM64 no-jemalloc
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: pathwaycom/pathway
+          ref: v0.8.0
+      - uses: docker/setup-qemu-action@v2
+      - run: mkdir -p wheels
+      - name: Build
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v $PWD:/src \
+            python:3.11-slim bash -c "
+            apt-get update && apt-get install -y git build-essential cmake curl pkg-config libssl-dev &&
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
+            . /root/.cargo/env &&
+            cd /src/python &&
+            export MATURIN_EXTRA_ARGS='--features pathway-ffi/standard-allocator' &&
+            pip install . --no-build-isolation -v 2>&1 | tail -20 &&
+            mkdir -p /src/wheels &&
+            pip wheel . --no-deps -w /src/wheels/
+            "
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pathway-arm64-whl
+          path: wheels/*.whl
