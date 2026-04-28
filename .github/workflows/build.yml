@@ -18,11 +18,9 @@ jobs:
             apt-get update && apt-get install -y git build-essential cmake curl pkg-config libssl-dev &&
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
             . /root/.cargo/env &&
-            ls /src/ &&
-            ls /src/python/ &&
-            cd /src/python && ls *.toml *.cfg 2>/dev/null &&
+            cd /src &&
             export MATURIN_EXTRA_ARGS='--features pathway-ffi/standard-allocator' &&
-            pip install . --no-build-isolation -v 2>&1 | tail -20 &&
+            pip install . --no-build-isolation -v 2>&1 | tail -30 &&
             mkdir -p /src/wheels &&
             pip wheel . --no-deps -w /src/wheels/
             "
