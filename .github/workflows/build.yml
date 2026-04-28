@@ -4,7 +4,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v3
         with:
           repository: pathwaycom/pathway
           ref: v0.8.0
@@ -24,7 +24,7 @@ jobs:
             mkdir -p /src/wheels &&
             pip wheel . --no-deps -w /src/wheels/
             "
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: pathway-arm64-whl
           path: wheels/*.whl
