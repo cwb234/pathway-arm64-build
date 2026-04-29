@@ -25,7 +25,7 @@ jobs:
             rustup default 1.75.0 &&
             cd /src &&
             pip install maturin &&
-            maturin build --release --features standard-allocator --interpreter python3 --manylinux 2014 -o /src/wheels/
+            maturin build --release --features standard-allocator --interpreter python3 --manylinux off -o /src/wheels/
             "
 
       - uses: actions/upload-artifact@v4
