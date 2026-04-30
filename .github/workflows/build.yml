@@ -26,8 +26,12 @@ jobs:
             -v $PWD:/src \
             quay.io/pypa/manylinux2014_aarch64:latest \
             bash -c "
-            # 安装系统依赖（CentOS 7 包名：pkgconfig 不是 pkg-config）
+            # 安装系统依赖
             yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl-devel git &&
+
+            # 查看可用的 Python 版本
+            echo '=== Available Python versions ===' &&
+            ls /opt/python/ &&
 
             # 安装 Rust
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
@@ -35,14 +39,26 @@ jobs:
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
 
-            # 确认 Python 3.11 路径
-            ls /opt/python/ | grep cp311 &&
+            # 使用 Python 3.11
             PYTHON=/opt/python/cp311-cp311/bin/python &&
+            PYTHON_LIB=/opt/python/cp311-cp311/lib &&
+            PYTHON_INCLUDE=/opt/python/cp311-cp311/include/python3.11 &&
+
+            # 设置库路径，让 pyo3 能找到 libpython
+            export LIBRARY_PATH=\$PYTHON_LIB:\$LIBRARY_PATH &&
+            export LD_LIBRARY_PATH=\$PYTHON_LIB:\$LD_LIBRARY_PATH &&
+            export C_INCLUDE_PATH=\$PYTHON_INCLUDE:\$C_INCLUDE_PATH &&
+            export CPLUS_INCLUDE_PATH=\$PYTHON_INCLUDE:\$CPLUS_INCLUDE_PATH &&
+
+            # 检查 libpython 是否存在（调试用）
+            echo '=== Python lib files ===' &&
+            ls -la \$PYTHON_LIB/libpython* || echo 'No static lib found' &&
+            ls -la \$PYTHON_LIB/libpython*.so || echo 'No shared lib found' &&
 
             # 安装 maturin
             \$PYTHON -m pip install maturin &&
 
-            # 强制使用系统 OpenSSL，避免从源码编译 OpenSSL（绕过 Perl IPC::Cmd 缺失问题）
+            # 强制使用系统 OpenSSL，避免 OpenSSL 源码编译
             export OPENSSL_DIR=/usr &&
             export OPENSSL_NO_VENDOR=1 &&
 
