@@ -1,45 +1,60 @@
 name: Build pathway ARM64 no-jemalloc
-on: [workflow_dispatch]
+
+on:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout pathway v0.8.0
+        uses: actions/checkout@v3
         with:
           repository: pathwaycom/pathway
           ref: v0.8.0
 
-      - uses: docker/setup-qemu-action@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
-      - run: mkdir -p wheels
+      - name: Create wheels dir
+        run: mkdir -p wheels
 
-      - name: Build
+      - name: Build wheel (manylinux_2_17, glibc 2.17 compatible)
         run: |
           docker run --rm --platform linux/arm64 \
             -v $PWD:/src \
-            quay.io/pypa/manylinux_2_17_aarch64:latest \
+            pypa/manylinux_2_17_aarch64:latest \
             bash -c "
             # 安装系统依赖
             yum install -y gcc gcc-c++ make cmake curl pkg-config openssl-devel git &&
+
             # 安装 Rust
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
             . /root/.cargo/env &&
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
-            # 安装 Python 3.11（manylinux 默认可能是 3.8，需要确认）
-            # manylinux_2_17 自带多个 Python 版本，直接可用
-            /opt/python/cp311-cp311/bin/pip install maturin &&
+
+            # 确认 Python 3.11 路径（manylinux 镜像预装多版本）
+            ls /opt/python/ | grep cp311 &&
+            PYTHON=/opt/python/cp311-cp311/bin/python &&
+            PIP=/opt/python/cp311-cp311/bin/pip &&
+
+            # 安装 maturin
+            \$PIP install maturin &&
+
+            # 编译 pathway，禁用 jemalloc
             cd /src &&
-            /opt/python/cp311-cp311/bin/maturin build \
+            \$PYTHON -m maturin build \
               --release \
               --features standard-allocator \
-              --interpreter /opt/python/cp311-cp311/bin/python \
+              --interpreter \$PYTHON \
               --manylinux 2_17 \
               -o /src/wheels/
             "
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: pathway-arm64-whl
+          name: pathway-arm64-no-jemalloc-glibc217
           path: wheels/*.whl
