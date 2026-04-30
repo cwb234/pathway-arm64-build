@@ -17,25 +17,40 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      - name: Pull manylinux_2_17 image (fixed tag)
-        run: |
-          docker pull quay.io/pypa/manylinux_2_17_aarch64:2024-12-01-7ae8cb4
-
       - name: Create wheels dir
         run: mkdir -p wheels
 
-      - name: Build wheel (manylinux_2_17, glibc 2.17)
+      - name: Build wheel (manylinux2014, glibc 2.17)
         run: |
           docker run --rm --platform linux/arm64 \
             -v $PWD:/src \
-            quay.io/pypa/manylinux_2_17_aarch64:2024-12-01-7ae8cb4 \
+            quay.io/pypa/manylinux2014_aarch64:latest \
             bash -c "
-            # 安装系统依赖（CentOS 7 包名：pkgconfig）
-            yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl-devel git &&
+            # 安装编译依赖
+            yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl-devel git \
+                           zlib-devel bzip2-devel readline-devel sqlite-devel \
+                           tk-devel xz-devel libffi-devel &&
 
-            # 调试：确认 Python 静态库存在
+            # 从源码编译 Python 3.11（带静态库 libpython3.11.a）
+            cd /tmp &&
+            curl -LO https://www.python.org/ftp/python/3.11.5/Python-3.11.5.tgz &&
+            tar xzf Python-3.11.5.tgz &&
+            cd Python-3.11.5 &&
+            ./configure --enable-optimizations --prefix=/usr/local/python3.11 --with-static-libpython &&
+            make -j\$(nproc) &&
+            make install &&
+
+            # 设置 Python 路径
+            export PATH=/usr/local/python3.11/bin:\$PATH &&
+            PYTHON=/usr/local/python3.11/bin/python3.11 &&
+            PYTHON_LIB=/usr/local/python3.11/lib &&
+
+            # 验证静态库存在
             echo '=== Python libs ===' &&
-            ls -la /opt/python/cp311-cp311/lib/libpython* &&
+            ls -la \$PYTHON_LIB/libpython* &&
+
+            # 安装 maturin
+            \$PYTHON -m pip install maturin &&
 
             # 安装 Rust
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
@@ -43,12 +58,7 @@ jobs:
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
 
-            PYTHON=/opt/python/cp311-cp311/bin/python &&
-
-            # 安装 maturin
-            \$PYTHON -m pip install maturin &&
-
-            # 强制使用系统 OpenSSL，避免 OpenSSL 源码编译
+            # 强制使用系统 OpenSSL
             export OPENSSL_DIR=/usr &&
             export OPENSSL_NO_VENDOR=1 &&
 
@@ -58,7 +68,6 @@ jobs:
               --release \
               --features standard-allocator \
               --interpreter \$PYTHON \
-              --manylinux 2_17 \
               -o /src/wheels/
             "
 
