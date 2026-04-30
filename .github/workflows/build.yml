@@ -20,11 +20,11 @@ jobs:
       - name: Create wheels dir
         run: mkdir -p wheels
 
-      - name: Build wheel (manylinux_2_17, glibc 2.17 compatible)
+      - name: Build wheel (manylinux2014, glibc 2.17)
         run: |
           docker run --rm --platform linux/arm64 \
             -v $PWD:/src \
-            pypa/manylinux_2_17_aarch64:latest \
+            quay.io/pypa/manylinux2014_aarch64:latest \
             bash -c "
             # 安装系统依赖
             yum install -y gcc gcc-c++ make cmake curl pkg-config openssl-devel git &&
@@ -35,13 +35,12 @@ jobs:
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
 
-            # 确认 Python 3.11 路径（manylinux 镜像预装多版本）
-            ls /opt/python/ | grep cp311 &&
-            PYTHON=/opt/python/cp311-cp311/bin/python &&
-            PIP=/opt/python/cp311-cp311/bin/pip &&
+            # 查看可用的 Python 版本
+            ls /opt/python/ &&
 
-            # 安装 maturin
-            \$PIP install maturin &&
+            # 使用 Python 3.11
+            PYTHON=/opt/python/cp311-cp311/bin/python &&
+            \$PYTHON -m pip install maturin &&
 
             # 编译 pathway，禁用 jemalloc
             cd /src &&
@@ -49,7 +48,6 @@ jobs:
               --release \
               --features standard-allocator \
               --interpreter \$PYTHON \
-              --manylinux 2_17 \
               -o /src/wheels/
             "
 
