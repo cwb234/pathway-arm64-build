@@ -17,21 +17,25 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
+      - name: Pull manylinux_2_17 image (fixed tag)
+        run: |
+          docker pull quay.io/pypa/manylinux_2_17_aarch64:2024-12-01-7ae8cb4
+
       - name: Create wheels dir
         run: mkdir -p wheels
 
-      - name: Build wheel (manylinux2014, glibc 2.17)
+      - name: Build wheel (manylinux_2_17, glibc 2.17)
         run: |
           docker run --rm --platform linux/arm64 \
             -v $PWD:/src \
-            quay.io/pypa/manylinux2014_aarch64:latest \
+            quay.io/pypa/manylinux_2_17_aarch64:2024-12-01-7ae8cb4 \
             bash -c "
-            # 安装系统依赖
+            # 安装系统依赖（CentOS 7 包名：pkgconfig）
             yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl-devel git &&
 
-            # 查看可用的 Python 版本
-            echo '=== Available Python versions ===' &&
-            ls /opt/python/ &&
+            # 调试：确认 Python 静态库存在
+            echo '=== Python libs ===' &&
+            ls -la /opt/python/cp311-cp311/lib/libpython* &&
 
             # 安装 Rust
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
@@ -39,21 +43,7 @@ jobs:
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
 
-            # 使用 Python 3.11
             PYTHON=/opt/python/cp311-cp311/bin/python &&
-            PYTHON_LIB=/opt/python/cp311-cp311/lib &&
-            PYTHON_INCLUDE=/opt/python/cp311-cp311/include/python3.11 &&
-
-            # 设置库路径，让 pyo3 能找到 libpython
-            export LIBRARY_PATH=\$PYTHON_LIB:\$LIBRARY_PATH &&
-            export LD_LIBRARY_PATH=\$PYTHON_LIB:\$LD_LIBRARY_PATH &&
-            export C_INCLUDE_PATH=\$PYTHON_INCLUDE:\$C_INCLUDE_PATH &&
-            export CPLUS_INCLUDE_PATH=\$PYTHON_INCLUDE:\$CPLUS_INCLUDE_PATH &&
-
-            # 检查 libpython 是否存在（调试用）
-            echo '=== Python lib files ===' &&
-            ls -la \$PYTHON_LIB/libpython* || echo 'No static lib found' &&
-            ls -la \$PYTHON_LIB/libpython*.so || echo 'No shared lib found' &&
 
             # 安装 maturin
             \$PYTHON -m pip install maturin &&
@@ -68,6 +58,7 @@ jobs:
               --release \
               --features standard-allocator \
               --interpreter \$PYTHON \
+              --manylinux 2_17 \
               -o /src/wheels/
             "
 
