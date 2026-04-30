@@ -26,8 +26,8 @@ jobs:
             -v $PWD:/src \
             quay.io/pypa/manylinux2014_aarch64:latest \
             bash -c "
-            # 安装系统依赖
-            yum install -y gcc gcc-c++ make cmake curl pkg-config openssl-devel git &&
+            # 安装系统依赖（CentOS 7 包名注意）
+            yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl-devel git &&
 
             # 安装 Rust
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
