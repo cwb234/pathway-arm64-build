@@ -1,5 +1,6 @@
 name: Build pathway ARM64 no-jemalloc
 on: [workflow_dispatch]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,15 +18,25 @@ jobs:
         run: |
           docker run --rm --platform linux/arm64 \
             -v $PWD:/src \
-            python:3.11-slim bash -c "
-            apt-get update && apt-get install -y git build-essential cmake curl pkg-config libssl-dev &&
+            quay.io/pypa/manylinux_2_17_aarch64:latest \
+            bash -c "
+            # 安装系统依赖
+            yum install -y gcc gcc-c++ make cmake curl pkg-config openssl-devel git &&
+            # 安装 Rust
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
             . /root/.cargo/env &&
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
+            # 安装 Python 3.11（manylinux 默认可能是 3.8，需要确认）
+            # manylinux_2_17 自带多个 Python 版本，直接可用
+            /opt/python/cp311-cp311/bin/pip install maturin &&
             cd /src &&
-            pip install maturin &&
-            maturin build --release --features standard-allocator --interpreter python3 --manylinux off -o /src/wheels/
+            /opt/python/cp311-cp311/bin/maturin build \
+              --release \
+              --features standard-allocator \
+              --interpreter /opt/python/cp311-cp311/bin/python \
+              --manylinux 2_17 \
+              -o /src/wheels/
             "
 
       - uses: actions/upload-artifact@v4
