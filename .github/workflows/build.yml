@@ -26,7 +26,7 @@ jobs:
             -v $PWD:/src \
             quay.io/pypa/manylinux2014_aarch64:latest \
             bash -c "
-            # 安装系统依赖（CentOS 7 包名注意）
+            # 安装系统依赖（CentOS 7 包名：pkgconfig 不是 pkg-config）
             yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl-devel git &&
 
             # 安装 Rust
@@ -35,12 +35,16 @@ jobs:
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
 
-            # 查看可用的 Python 版本
-            ls /opt/python/ &&
-
-            # 使用 Python 3.11
+            # 确认 Python 3.11 路径
+            ls /opt/python/ | grep cp311 &&
             PYTHON=/opt/python/cp311-cp311/bin/python &&
+
+            # 安装 maturin
             \$PYTHON -m pip install maturin &&
+
+            # 强制使用系统 OpenSSL，避免从源码编译 OpenSSL（绕过 Perl IPC::Cmd 缺失问题）
+            export OPENSSL_DIR=/usr &&
+            export OPENSSL_NO_VENDOR=1 &&
 
             # 编译 pathway，禁用 jemalloc
             cd /src &&
