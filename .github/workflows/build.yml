@@ -26,17 +26,24 @@ jobs:
             -v $PWD:/src \
             quay.io/pypa/manylinux2014_aarch64:latest \
             bash -c "
-            # 安装编译依赖
-            yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl-devel git \
+            # 安装编译依赖（openssl-devel 必须在 Python 编译前安装）
+            yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl openssl-devel git \
                            zlib-devel bzip2-devel readline-devel sqlite-devel \
-                           tk-devel xz-devel libffi-devel &&
+                           tk-devel xz-devel libffi-devel ncurses-devel &&
 
-            # 从源码编译 Python 3.11（带静态库 libpython3.11.a）
+            # 从源码编译 Python 3.11（带静态库 + SSL 支持）
             cd /tmp &&
             curl -LO https://www.python.org/ftp/python/3.11.5/Python-3.11.5.tgz &&
             tar xzf Python-3.11.5.tgz &&
             cd Python-3.11.5 &&
-            ./configure --enable-optimizations --prefix=/usr/local/python3.11 --with-static-libpython &&
+            ./configure \
+              --enable-optimizations \
+              --prefix=/usr/local/python3.11 \
+              --with-static-libpython \
+              --with-openssl=/usr \
+              --with-openssl-rpath=auto \
+              --enable-loadable-sqlite-extensions &&
+
             make -j\$(nproc) &&
             make install &&
 
@@ -45,11 +52,14 @@ jobs:
             PYTHON=/usr/local/python3.11/bin/python3.11 &&
             PYTHON_LIB=/usr/local/python3.11/lib &&
 
-            # 验证静态库存在
+            # 验证静态库和 SSL 模块
             echo '=== Python libs ===' &&
             ls -la \$PYTHON_LIB/libpython* &&
+            echo '=== SSL module check ===' &&
+            \$PYTHON -c 'import ssl; print(ssl.OPENSSL_VERSION)' &&
 
-            # 安装 maturin
+            # 安装 maturin（从源码编译，避免 SSL 问题）
+            \$PYTHON -m pip install --upgrade pip &&
             \$PYTHON -m pip install maturin &&
 
             # 安装 Rust
