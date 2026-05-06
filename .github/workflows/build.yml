@@ -43,7 +43,7 @@ jobs:
             make install &&
             export LD_LIBRARY_PATH=/usr/local/openssl1.1/lib:\$LD_LIBRARY_PATH &&
 
-            # === 第二步：编译 Python 3.11（带静态库 + 指向 OpenSSL 1.1.1）===
+            # === 第二步：编译 Python 3.11 ===
             cd /tmp &&
             curl -LO https://www.python.org/ftp/python/3.11.5/Python-3.11.5.tgz &&
             tar xzf Python-3.11.5.tgz &&
@@ -57,12 +57,10 @@ jobs:
             make -j\$(nproc) &&
             make install &&
 
-            # 设置路径
             export PATH=/usr/local/python3.11/bin:\$PATH &&
             PYTHON=/usr/local/python3.11/bin/python3.11 &&
 
             # 验证 SSL
-            echo '=== SSL check ===' &&
             \$PYTHON -c 'import ssl; print(ssl.OPENSSL_VERSION)' &&
 
             # === 第三步：安装 maturin ===
@@ -75,12 +73,15 @@ jobs:
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
 
-            # 强制使用编译好的 OpenSSL 1.1.1
+            # === 第五步：设置编译环境 ===
             export OPENSSL_DIR=/usr/local/openssl1.1 &&
             export OPENSSL_NO_VENDOR=1 &&
             export PKG_CONFIG_PATH=/usr/local/openssl1.1/lib/pkgconfig:\$PKG_CONFIG_PATH &&
 
-            # === 第五步：编译 pathway ===
+            # 关键：解决 librdkafka CMakeLists.txt 版本兼容问题
+            export CMAKE_ARGS='-DCMAKE_POLICY_VERSION_MINIMUM=3.5' &&
+
+            # === 第六步：编译 pathway ===
             cd /src &&
             \$PYTHON -m maturin build \
               --release \
