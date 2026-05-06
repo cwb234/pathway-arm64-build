@@ -26,12 +26,24 @@ jobs:
             -v $PWD:/src \
             quay.io/pypa/manylinux2014_aarch64:latest \
             bash -c "
-            # 安装编译依赖（openssl-devel 必须在 Python 编译前安装）
-            yum install -y gcc gcc-c++ make cmake curl pkgconfig openssl openssl-devel git \
+            set -ex &&
+
+            # 安装编译依赖
+            yum install -y gcc gcc-c++ make cmake curl pkgconfig git \
                            zlib-devel bzip2-devel readline-devel sqlite-devel \
                            tk-devel xz-devel libffi-devel ncurses-devel &&
 
-            # 从源码编译 Python 3.11（带静态库 + SSL 支持）
+            # === 第一步：编译 OpenSSL 1.1.1 ===
+            cd /tmp &&
+            curl -LO https://www.openssl.org/source/openssl-1.1.1w.tar.gz &&
+            tar xzf openssl-1.1.1w.tar.gz &&
+            cd openssl-1.1.1w &&
+            ./config --prefix=/usr/local/openssl1.1 --openssldir=/usr/local/openssl1.1 shared zlib &&
+            make -j\$(nproc) &&
+            make install &&
+            export LD_LIBRARY_PATH=/usr/local/openssl1.1/lib:\$LD_LIBRARY_PATH &&
+
+            # === 第二步：编译 Python 3.11（带静态库 + 指向 OpenSSL 1.1.1）===
             cd /tmp &&
             curl -LO https://www.python.org/ftp/python/3.11.5/Python-3.11.5.tgz &&
             tar xzf Python-3.11.5.tgz &&
@@ -40,39 +52,35 @@ jobs:
               --enable-optimizations \
               --prefix=/usr/local/python3.11 \
               --with-static-libpython \
-              --with-openssl=/usr \
-              --with-openssl-rpath=auto \
-              --enable-loadable-sqlite-extensions &&
-
+              --with-openssl=/usr/local/openssl1.1 \
+              --with-openssl-rpath=auto &&
             make -j\$(nproc) &&
             make install &&
 
-            # 设置 Python 路径
+            # 设置路径
             export PATH=/usr/local/python3.11/bin:\$PATH &&
             PYTHON=/usr/local/python3.11/bin/python3.11 &&
-            PYTHON_LIB=/usr/local/python3.11/lib &&
 
-            # 验证静态库和 SSL 模块
-            echo '=== Python libs ===' &&
-            ls -la \$PYTHON_LIB/libpython* &&
-            echo '=== SSL module check ===' &&
+            # 验证 SSL
+            echo '=== SSL check ===' &&
             \$PYTHON -c 'import ssl; print(ssl.OPENSSL_VERSION)' &&
 
-            # 安装 maturin（从源码编译，避免 SSL 问题）
+            # === 第三步：安装 maturin ===
             \$PYTHON -m pip install --upgrade pip &&
             \$PYTHON -m pip install maturin &&
 
-            # 安装 Rust
+            # === 第四步：安装 Rust ===
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
             . /root/.cargo/env &&
             rustup install 1.75.0 &&
             rustup default 1.75.0 &&
 
-            # 强制使用系统 OpenSSL
-            export OPENSSL_DIR=/usr &&
+            # 强制使用编译好的 OpenSSL 1.1.1
+            export OPENSSL_DIR=/usr/local/openssl1.1 &&
             export OPENSSL_NO_VENDOR=1 &&
+            export PKG_CONFIG_PATH=/usr/local/openssl1.1/lib/pkgconfig:\$PKG_CONFIG_PATH &&
 
-            # 编译 pathway，禁用 jemalloc
+            # === 第五步：编译 pathway ===
             cd /src &&
             \$PYTHON -m maturin build \
               --release \
